@@ -1,0 +1,602 @@
+---
+title: "Cianini_bulk"
+author: "Eleonora Cianini"
+date: "9/30/2021"
+output: html_document
+---
+
+# [I] - Libraries
+Load all the libraries required for the analysis
+```{r, message=FALSE}
+library(recount)
+library(limma)
+library(edgeR)
+library(ggplot2)
+library(AnnotationDbi)
+library(clusterProfiler)
+library(org.Hs.eg.db)
+library(xlsx)
+```
+
+
+# [II] -Retrieving the data and Pre-processing the count tables
+All the data comes from the GTEx project database, and here we got the Liver, Heart and Colon's tissues, with 3 samples per tissue: 
+
+## Liver
+```{r, message=FALSE}
+#####LIVER#####
+load("rse_gene_liver_9_scaled.Rdata")
+liver_rse <- rse
+```
+
+##### 1. Select the three columns in which we have to work on
+```{r, message=FALSE}
+liver_count <- assays(liver_rse)$counts[, 3:5]
+dim(liver_count)
+tot_reads_liver <- colSums(liver_count)
+```
+
+##### 2. Remove all genes with length < 200
+```{r, message=FALSE}
+small_genes_9 <- rowRanges(liver_rse)[rowData(liver_rse)$bp_length < 200, ]
+small_liver <-which(rownames(liver_count) %in% small_genes_9$gene_id)
+clean_small_9 <- liver_count[-c(small_liver),] 
+cleaned_small_9 <- colSums(clean_small_9) 
+
+## produce the overall read count associated with these genes in each tissue/replicate
+short_RNAs_liver <- (tot_reads_liver - cleaned_small_9) #73154 47129 73677
+perc_short_RNAs_liver <- (short_RNAs_liver/tot_reads_liver)*100
+```
+
+##### 3. Remove all mitochondrial genes
+```{r, message=FALSE}
+mit_genes_9 <- rowRanges(liver_rse)[seqnames(rowRanges(liver_rse)) == "chrM" &
+                                      rowRanges(liver_rse)$bp_length >= 200, ]
+
+#15 mitocondrial genes (22 are mitocondrial genes < 200bp counted in the small)
+mit_liver <-which(rownames(liver_count) %in% mit_genes_9$gene_id)
+clean_mit_9 <- liver_count[-c(mit_liver),] 
+cleaned_mit_9 <- colSums(clean_mit_9) 
+
+## produce the overall read count associated with these genes in each tissue replicate
+mit_RNAs_liver <- (tot_reads_liver - cleaned_mit_9) 
+perc_mit_RNAs_liver <- (mit_RNAs_liver/tot_reads_liver)*100
+
+clean_liver <- liver_count[-c(small_liver, mit_liver),]
+dim(clean_liver)
+```
+
+## Heart
+```{r, message=FALSE}
+#####HEART#####
+load("rse_gene_heart_6_scaled.Rdata")
+heart_rse <- rse
+```
+
+
+##### 1. Select the three columns in which we have to work on
+```{r, message=FALSE}
+heart_count <- assays(heart_rse)$counts[, 2:4] 
+tot_reads_heart <- colSums(heart_count) 
+```
+
+##### 2. Remove all genes with length < 200
+```{r, message=FALSE}
+small_genes_6 <- rowRanges(heart_rse)[rowRanges(heart_rse)$bp_length < 200, ]
+small_heart <-which(rownames(heart_count) %in% small_genes_6$gene_id)
+clean_small_6 <- heart_count[-c(small_heart),] 
+cleaned_small_6 <- colSums(clean_small_6) 
+
+## produce the overall read count associated with these genes in each tissue/replicate
+short_RNAs_heart <- (tot_reads_heart - cleaned_small_6) 
+perc_short_RNAs_heart <- (short_RNAs_heart/tot_reads_heart)*100
+```
+
+
+#####3. Remove all mitochondrial genes
+```{r, message=FALSE}
+mit_genes_6 <- rowRanges(heart_rse)[seqnames(rowRanges(heart_rse)) == "chrM" &
+                                      rowRanges(heart_rse)$bp_length >= 200, ]
+mit_heart <-which(rownames(heart_count) %in% mit_genes_6$gene_id)
+clean_mit_6 <- heart_count[-c(mit_heart),]
+cleaned_mit_6 <- colSums(clean_mit_6) 
+```
+Produce the overall read count associated with these genes in each tissue replicate
+```{r, message=FALSE}
+mit_RNAs_heart <- (tot_reads_heart - cleaned_mit_6)   
+perc_mit_RNAs_heart <- (mit_RNAs_heart/tot_reads_heart)*100
+
+clean_heart <- heart_count[-c(small_heart, mit_heart),]
+dim(clean_heart)
+```
+
+## Colon
+```{r, message=FALSE}
+#####COLON#####
+load("rse_gene_colon_7_scaled.Rdata")
+colon_rse <- rse
+```
+
+
+##### 1. Select the three columns in which we have to work on
+```{r, message=FALSE}
+colon_count <- assays(colon_rse)$counts[, c(9, 10, 1)] # 58037 genes & 3 samples
+tot_reads_colon <- colSums(colon_count)# 38364393   38984105   37414767
+```
+##### 2. Remove all genes with length < 200
+```{r, message=FALSE}
+
+small_genes_7 <- rowRanges(colon_rse)[rowRanges(colon_rse)$bp_length < 200, ]
+small_colon <-which(rownames(colon_count) %in% small_genes_7$gene_id)
+clean_small_7 <- colon_count[-c(small_colon),] 
+cleaned_small_7 <- colSums(clean_small_7) 
+#produce the overall read count associated with these genes in each tissue/replicate
+short_RNAs_colon <- (tot_reads_colon - cleaned_small_7) 
+perc_short_RNAs_colon <- (short_RNAs_colon/tot_reads_colon)*100
+```
+
+#####3. Remove all mitochondrial genes
+```{r, message=FALSE}
+mit_genes_7 <- rowRanges(colon_rse)[seqnames(rowRanges(colon_rse)) == "chrM" &
+                                      rowRanges(colon_rse)$bp_length >= 200, ]
+#15 mitocondrial genes (22 are mitocondrial genes < 200bp counted in the small)
+mit_colon <-which(rownames(colon_count) %in% mit_genes_7$gene_id)
+clean_mit_7 <- colon_count[-c(mit_colon),]
+## produce the overall read count associated with these genes in each tissue replicate
+cleaned_mit_7 <- colSums(clean_mit_7)
+
+## produce the overall read count associated with these genes in each tissue replicate
+mit_RNAs_colon <- (tot_reads_colon - cleaned_mit_7)
+perc_mit_RNAs_colon <- (mit_RNAs_colon/tot_reads_colon)*100
+
+clean_colon <- colon_count[-c(small_colon, mit_colon),]
+dim(clean_colon)
+```
+
+
+# [III] - Merging the data
+Obtained all the information required from the count tables downloaded, we merged all the elements together a DGEobject, which contains all the information for the downstream analysis.
+
+```{r}
+#Merge the data
+data <- (cbind(clean_liver, clean_heart, clean_colon))
+colSums(data)
+
+#####DE analysis#####
+dim(data) #50681 genes 9 replicates
+
+#create DGElist
+y <- DGEList(counts=data)
+head(y)
+#label the samples
+group <- as.factor(c("liver", "liver", "liver", 
+                     "heart", "heart", "heart", 
+                     "colon", "colon", "colon"))
+y$samples$group <- group
+head(y)
+```
+
+# [IV] - Filtering step
+An important step for a good analysis is to obtain the counts filtered from the low-expressed genes.
+
+```{r}
+#REMOVE the low-expressed genes 
+keep.exprs <- filterByExpr(y, group=group)
+# filterByExpr remove genes that are not expressed
+## above a log-CPM threshold in a minimum number of samples
+
+summary(keep.exprs)
+
+y <- y[keep.exprs,, keep.lib.sizes=FALSE]
+
+# Almost 27k  genes have been filtered out with default parameters.
+dim(y)
+# The remained genes are 23786
+
+# Store the non-normalized counts 
+logcpm_before <- cpm(y, log=TRUE)
+```
+
+# [V] - Normalization step
+```{r}
+# Normalize the counts (TMM normalization, trimmed mean)
+y <- calcNormFactors(y, method = "TMM")
+#y$samples
+
+logcpm <- cpm(y, log=TRUE)
+```
+
+```{r}
+# boxplot of the non-normalized counts
+x11()
+boxplot(logcpm_before, notch=TRUE, outline = FALSE,
+        col=(c(rep("lightcyan3",3),rep("lightgoldenrod3", 3), 
+               rep("lightpink3",3))),
+        ylim = c(-5,20),
+        main="Log2CPM not normalized", xlab="Sample")
+legend(x = "topright",
+       legend = c("Liver","Heart","Colon"),
+       fill =c("lightcyan3","lightgoldenrod3",
+                 "lightpink3")
+)
+
+graphics.off()
+```
+
+```{r}
+# boxplot of the normalized counts
+x11()
+boxplot(logcpm, notch=TRUE, outline = FALSE,
+        col=(c(rep("lightcyan3",3),rep("lightgoldenrod3", 3), 
+               rep("lightpink3",3))),
+        ylim = c(-5,20),
+        main="Log2CPM post TMM normalization", xlab="Sample")
+legend(x = "topright",
+       legend = c("Liver","Heart","Colon"),
+       fill =c("lightcyan3","lightgoldenrod3",
+               "lightpink3"),
+       ncol = 3
+)
+
+graphics.off()
+```
+
+By eyes we can see a change in the boxplot of the normalized counts if compared to the non_normalized, in fact after the normalization more of the samples are closer to the median horizontal line. Normalized the data we can start with the desgin model.
+```{r}
+#design the linear model
+design <- model.matrix(~0+group, data=y$samples)
+# no intercept is used
+colnames(design) <- levels(y$samples$group)
+design
+```
+
+# [VI] - Exploring data and analyzing them
+```{r}
+# plot the samples labeled using MDS by tissue type
+x11()
+plotMDS(cpm(y, log=TRUE), 
+        labels = colnames(logcpm),
+        col = c(rep("lightcyan3",3), rep("lightgoldenrod3", 3),rep("lightpink3", 3)),
+        cex = 2
+        )
+legend("topright", legend = c("Liver", "Heart", "Colon"),
+       fill = c("lightcyan3", "lightgoldenrod3", "lightpink3" ))
+title(main = "MDS plot of the log-normalized samples")
+
+graphics.off()
+
+# plot the samples labeled by gender
+gender <- as.factor(c("male", "male", "male", 
+                      "female", "male", "male", 
+                      "female", "male", "male"))
+y$samples$gender <- gender
+y
+
+x11()
+plotMDS(cpm(y, log=TRUE), 
+        labels = colnames(logcpm),
+        col=ifelse(y$samples$gender =="female", "lightpink2", "mediumblue"),
+        cex = 2)
+legend("topright", legend = c("Female", "Male"),
+       fill = c("lightpink2", "mediumblue"))
+title(main = "MDS plot of the log-normalized samples by gender")
+
+graphics.off()
+```
+
+Observing the data, we investigate if the age 60-69 could be a biological factor or not. 
+```{r}
+# plot the samples labeled by age bracket
+age <- as.factor(c("30-39", "60-69", "60-69", 
+                      "20-29", "60-69", "60-69", 
+                      "40-49", "40-49", "50-59"))
+y$samples$age <- age
+#y
+
+x11()
+plotMDS(cpm(y, log=TRUE), 
+        labels = colnames(logcpm),
+        col=ifelse(y$samples$age =="60-69", "palegreen3", "sienna3")
+)
+legend(2, 4, legend = c("Age 60-69", "Other age ranges"),
+       fill = c("palegreen3", "sienna3"))
+
+title(main = "MDS plot of the log-normalized samples by age bracket")
+graphics.off()
+
+# Estimate BCV
+# We estimate the negative binomial (NB) dispersions with estimateDisp()
+y <- estimateDisp(y, design)
+summary(y$trended.dispersion)
+#y$common.dispersion
+```
+
+```{r}
+x11()
+plotBCV(y)
+title(main = "BCV and average logCPM plot")
+
+graphics.off()
+```
+
+```{r}
+# fit the data to the designed generalized linear model
+fit <- glmQLFit(y, design)
+
+# COLON VERSUS HEART
+# 1vs2: colon versus heart
+qlf.1vs2 <- glmQLFTest(fit, contrast = c(1, -1, 0))
+
+# select the significant ones, with corrected p-value (FDR) < 0.05: colon
+# versus colon
+FDR.1vs2 <- p.adjust(qlf.1vs2$table$PValue, method = "BH")
+
+#append the adjusted pvalue in the table
+qlf.1vs2$table$FDR <- FDR.1vs2
+#qlf.1vs2
+
+#plot 
+p <- ggplot(data=qlf.1vs2$table, 
+aes(x=logFC, y=-log10(FDR))) + geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks=seq(-15, 15, 0.5)) +
+  scale_y_continuous(breaks=seq(0, 3.5, 0.5))+
+  ggtitle("COLON vs HEART")
+p
+
+p2 <- p + geom_hline(yintercept=-log10(0.05), col="red")
+p2
+
+graphics.off()
+
+# add a column of NAs
+qlf.1vs2$table$DEgenes <- "NO"
+# if log2Foldchange > 0 and pvalue < 0.05, set as "UP" 
+qlf.1vs2$table$DEgenes[qlf.1vs2$table$logFC > 1 & qlf.1vs2$table$FDR < 0.05] <- "UP"
+# if log2Foldchange < 0 and pvalue < 0.05, set as "DOWN"
+qlf.1vs2$table$DEgenes[qlf.1vs2$table$logFC < -1 & qlf.1vs2$table$FDR < 0.05] <- "DOWN"
+
+# Re-plot but this time color the points with "DEgenes"
+p <- ggplot(data=qlf.1vs2$table, 
+            aes(x=logFC, y=-log10(FDR), 
+                col=DEgenes)) +
+  scale_x_continuous(breaks=seq(-15, 15, 0.5)) +
+  scale_y_continuous(breaks=seq(0, 3.5, 0.5)) + 
+  geom_point() + 
+  theme_minimal()+
+  ggtitle("COLON vs HEART")
+
+# Add lines as before...
+p2 <- p + geom_vline(xintercept=c(-1.25, 1.25), col="red") +
+  geom_hline(yintercept=-log10(0.05), col="red") 
+  
+mycolors <- c("turquoise3", "violetred3", "black")
+names(mycolors) <- c("DOWN", "UP", "NO")
+p3 <- p2 + scale_colour_manual(values = mycolors)
+p3
+graphics.off()
+
+summary(decideTests(qlf.1vs2, p.value = 0.05))
+
+deg.1vs2 <- topTags(qlf.1vs2, n = 20000, adjust.method = "BH", sort.by = "PValue",
+                    p.value = 0.05)$table
+
+
+up.genes.1vs2 <- row.names(deg.1vs2[deg.1vs2$logFC > 1, ]) #233
+down.genes.1vs2 <- row.names(deg.1vs2[deg.1vs2$logFC < -1, ]) #573 
+#deg.1vs2
+```
+
+Usually, the transformation is log at base 2, so the interpretation is straightforward: a log(FC) of 1 means twice as expressed.
+
+```{r}
+#COLON vs LIVER
+qlf.1vs3 <- glmQLFTest(fit, contrast = c(1, 0, -1))
+
+# select the significant ones, with corrected p-value (FDR) < 0.05: heart
+# versus colon
+FDR.1vs3 <- p.adjust(qlf.1vs3$table$PValue, method = "BH")
+
+#append the adjusted pvalue in the table
+qlf.1vs3$table$FDR <- FDR.1vs3
+#qlf.1vs3
+
+#plot 
+p <- ggplot(data=qlf.1vs3$table, 
+            aes(x=logFC, y=-log10(FDR))) + geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks=seq(-15, 15, 0.5)) +
+  scale_y_continuous(breaks=seq(0, 3.5, 0.5))+
+  ggtitle("COLON vs LIVER")
+p
+
+p2 <- p + geom_hline(yintercept=-log10(0.05), col="red")
+p2
+graphics.off()
+
+# add a column of NAs
+qlf.1vs3$table$DEgenes <- "NO"
+# if log2Foldchange > 0 and pvalue < 0.05, set as "UP" 
+qlf.1vs3$table$DEgenes[qlf.1vs3$table$logFC > 0.75 & qlf.1vs3$table$FDR < 0.05] <- "UP"
+# if log2Foldchange < 0 and pvalue < 0.05, set as "DOWN"
+qlf.1vs3$table$DEgenes[qlf.1vs3$table$logFC < -0.75 & qlf.1vs3$table$FDR < 0.05] <- "DOWN"
+
+# Re-plot but this time color the points with "DEgenes"
+p <- ggplot(data=qlf.1vs3$table, 
+            aes(x=logFC, y=-log10(FDR), 
+                col=DEgenes)) +
+  scale_x_continuous(breaks=seq(-15, 15, 0.5)) +
+  scale_y_continuous(breaks=seq(0, 3.5, 0.5)) + 
+  geom_point() + 
+  theme_minimal()+
+  ggtitle("COLON vs LIVER")
+
+# Add lines as before...
+p2 <- p + geom_vline(xintercept=c(-0.75, 0.75), col="red") +
+  geom_hline(yintercept=-log10(0.05), col="red") 
+
+mycolors <- c("turquoise3", "violetred3", "black")
+names(mycolors) <- c("DOWN", "UP", "NO")
+p3 <- p2 + scale_colour_manual(values = mycolors)
+p3
+
+graphics.off()
+
+summary(decideTests(qlf.1vs3, p.value = 0.05))
+
+deg.1vs3 <- topTags(qlf.1vs3, n = 20000, adjust.method = "BH", sort.by = "PValue",
+                    p.value = 0.05)$table
+up.genes.1vs3 <- row.names(deg.1vs3[deg.1vs3$logFC >1, ]) #1967 
+down.genes.1vs3 <- row.names(deg.1vs3[deg.1vs3$logFC < -1, ])#2210 
+#deg.1vs3
+
+#HEART vs LIVER
+qlf.2vs3 <- glmQLFTest(fit, contrast = c(0, 1, -1))
+FDR.2vs3 <- p.adjust(qlf.2vs3$table$PValue, method = "BH")
+
+#append the adjusted pvalue in the table
+qlf.2vs3$table$FDR <- FDR.2vs3
+#qlf.2vs3
+
+#plot 
+p <- ggplot(data=qlf.2vs3$table, 
+            aes(x=logFC, y=-log10(FDR))) + geom_point() +
+  theme_minimal() +
+  scale_x_continuous(breaks=seq(-15, 15, 0.5)) +
+  scale_y_continuous(breaks=seq(0, 3.5, 0.5))+
+  ggtitle("HEART vs LIVER")
+p
+
+p2 <- p + geom_hline(yintercept=-log10(0.05), col="red")
+p2
+
+graphics.off()
+
+# add a column of NAs
+qlf.2vs3$table$DEgenes <- "NO"
+# if log2Foldchange > 0 and pvalue < 0.05, set as "UP" 
+qlf.2vs3$table$DEgenes[qlf.2vs3$table$logFC > 0.75 & qlf.2vs3$table$FDR < 0.05] <- "UP"
+# if log2Foldchange < 0 and pvalue < 0.05, set as "DOWN"
+qlf.2vs3$table$DEgenes[qlf.2vs3$table$logFC < -0.75 & qlf.2vs3$table$FDR < 0.05] <- "DOWN"
+
+# Re-plot but this time color the points with "DEgenes"
+p <- ggplot(data=qlf.2vs3$table, 
+            aes(x=logFC, y=-log10(FDR), 
+                col=DEgenes)) +
+  scale_x_continuous(breaks=seq(-15, 15, 0.5)) +
+  scale_y_continuous(breaks=seq(0, 3.5, 0.5)) + 
+  geom_point() + 
+  theme_minimal()+
+  ggtitle("HEART vs LIVER")
+
+# Add lines as before...
+p2 <- p + geom_vline(xintercept=c(-0.75, 0.75), col="red") +
+  geom_hline(yintercept=-log10(0.05), col="red") 
+
+mycolors <- c("turquoise3", "violetred3", "black")
+names(mycolors) <- c("DOWN", "UP", "NO")
+p3 <- p2 + scale_colour_manual(values = mycolors)
+p3
+
+graphics.off()
+
+summary(decideTests(qlf.2vs3, p.value = 0.05))
+
+deg.2vs3 <- topTags(qlf.2vs3, n = 20000, adjust.method = "BH", sort.by = "PValue",
+                    p.value = 0.05)$table
+up.genes.2vs3 <- row.names(deg.2vs3[deg.2vs3$logFC > 1, ])#2501 
+down.genes.2vs3 <- row.names(deg.2vs3[deg.2vs3$logFC < -1, ])#2654 
+#deg.2vs3
+```
+
+And now I'm going to find the up and down regulated genes of my dataset
+
+```{r}
+# Colon
+up.colon <- intersect(up.genes.1vs2, up.genes.1vs3)
+down.colon <- intersect(down.genes.1vs2, down.genes.1vs3)
+
+# Heart
+up.heart <- intersect(up.genes.2vs3, down.genes.1vs2)
+down.heart <- intersect(down.genes.2vs3, up.genes.1vs2)
+
+# Liver
+up.liver <- intersect(down.genes.1vs3, down.genes.2vs3)
+down.liver <- intersect(up.genes.1vs3, up.genes.2vs3)
+
+```
+
+# [VII] - Prepare the file for the export to Excel
+The following code was founded in GitHub taken from the Daniele Colombo's vignette. 
+```{r, message=FALSE}
+de.genes.dataframe <- function(col1, col2, column.names) {
+  de.genes <- data.frame(col1 = rep(NA, max(sapply(list(col1, col2), length))))
+  de.genes[1:length(col1), 1] <- col1
+  de.genes[1:length(col2), 2] <- col2
+  colnames(de.genes) <- column.names
+  
+  return(de.genes)
+}
+```
+
+```{r, message=FALSE}
+comparison.1vs2 <- de.genes.dataframe(up.genes.1vs2, down.genes.1vs2, c("up.colon.vs.heart",
+                                                                        "down.colon.vs.heart"))
+comparison.1vs3 <- de.genes.dataframe(up.genes.1vs3, down.genes.1vs3, c("up.colon.vs.liver",
+                                                                        "down.colon.vs.liver"))
+comparison.2vs3 <- de.genes.dataframe(up.genes.2vs3, down.genes.2vs3, c("up.heart.vs.liver",
+                                                                        "down.heart.vs.liver"))
+
+de.genes.colon <- de.genes.dataframe(up.colon, down.colon, c("up.colon", "down.colon"))
+de.genes.heart <- de.genes.dataframe(up.heart, down.heart, c("up.heart", "down.heart"))
+de.genes.liver <- de.genes.dataframe(up.liver, down.liver, c("up.liver", "down.liver"))
+```
+
+Obtaining the xls files of the DE gene list
+```{r, message=FALSE}
+write.xlsx(comparison.1vs2, "DE_genes.xlsx", sheetName = "Tissue 1 vs 2", col.names = TRUE,
+                 row.names = FALSE, append = FALSE, showNA = FALSE)
+write.xlsx(comparison.1vs3, "DE_genes.xlsx", sheetName = "Tissue 1 vs 3", col.names = TRUE,
+                 row.names = FALSE, append = TRUE, showNA = FALSE)
+write.xlsx(comparison.2vs3, "DE_genes.xlsx", sheetName = "Tissue 2 vs 3", col.names = TRUE,
+                 row.names = FALSE, append = TRUE, showNA = FALSE)
+write.xlsx(de.genes.colon, "DE_genes.xlsx", sheetName = "DE genes tissue 1",
+                 col.names = TRUE, row.names = FALSE, append = TRUE, showNA = FALSE)
+write.xlsx(de.genes.heart, "DE_genes.xlsx", sheetName = "DE genes tissue 2",
+                 col.names = TRUE, row.names = FALSE, append = TRUE, showNA = FALSE)
+write.xlsx(de.genes.liver, "DE_genes.xlsx", sheetName = "DE genes tissue 3",
+                 col.names = TRUE, row.names = FALSE, append = TRUE, showNA = FALSE)
+```
+
+For the functional enrichment analysis we needed to retrieve the list of gene_symbols using Enrichr, so:
+
+```{r, message=FALSE}
+# functional enrichment analysis 
+write.gene.symbols <- function(ensembl, file.name) {
+  symbols <- mapIds(org.Hs.eg.db, keys = gsub("\\..*", "", ensembl), keytype = "ENSEMBL",
+                    column = "SYMBOL", multiVals = "first")
+  write.table(symbols[!is.na(symbols)], file.name, col.names = F, row.names = F,
+              quote = F)
+}
+
+write.gene.symbols(up.colon, "up_colon_symbols.txt")
+write.gene.symbols(up.heart, "up_heart_symbols.txt")
+write.gene.symbols(up.liver, "up_liver_symbols.txt")
+
+```
+
+
+```{r}
+up_1vs2_FDR <- data.frame(deg.1vs2[deg.1vs2$logFC > 0,]$FDR)
+up_1vs2_FDR$ENSG <- row.names(deg.1vs2[deg.1vs2$logFC > 0,])
+row.names(up_1vs2_FDR) <- up_1vs2_FDR$ENSG
+
+up_1vs3_FDR <- data.frame(deg.1vs3[deg.1vs3$logFC > 0,]$FDR)
+up_1vs3_FDR$ENSG <- row.names(deg.1vs3[deg.1vs3$logFC > 0,])
+row.names(up_1vs3_FDR) <- up_1vs3_FDR$ENSG
+
+up_both <- merge(up_1vs2_FDR,up_1vs3_FDR)
+sort_up_both <- up_both[order(up_both$deg.1vs2.deg.1vs2.logFC...0....FDR,up_both$deg.1vs3.deg.1vs3.logFC...0....FDR),]
+
+```
+
